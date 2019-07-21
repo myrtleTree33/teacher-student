@@ -6,7 +6,6 @@ import mongoose from 'mongoose';
 import cors from 'cors';
 
 import logger from './logger';
-import { initPassport } from './utils/socialAuth';
 
 import baseRoutes from './routes/baseRoutes';
 import userRoutes from './routes/userRoutes';
@@ -32,9 +31,6 @@ app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(express.static(path.join(__dirname, '../public')));
-
-// Uncomment this to enable social authentication
-initPassport(app);
 
 // Routes
 app.use('/', baseRoutes);
