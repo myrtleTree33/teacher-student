@@ -31,4 +31,3 @@ studentSchema.set('toJSON', {
 studentSchema.plugin(mongooseHidden());
 
 export default mongoose.model('Student', studentSchema);
-Student;

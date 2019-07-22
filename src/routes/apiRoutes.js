@@ -1,19 +1,28 @@
 import { Router } from 'express';
+import _ from 'lodash';
+
+import logger from '../logger';
+
 import Teacher from '../models/Teacher';
 import Student from '../models/Student';
 import Pair from '../models/Pair';
-import logger from '../logger';
-import { pathToFileURL } from 'url';
 
 const routes = Router();
 
 /**
- * GET home page
+ * Helper to retrieve email mentions in
+ * a notification.
+ *
+ * @param {*} notification
  */
-routes.get('/', (req, res) => {
-  res.json({ message: 'Welcome to starter-backend!' });
-});
+const retrieveEmails = notification => {
+  const tokens = notification.split(' @');
+  return tokens.filter(t => t.includes('@'));
+};
 
+/**
+ * Registers or updates a student to a teacher
+ */
 routes.post('/register', async (req, res) => {
   try {
     const { teacher, students = [] } = req.body;
@@ -25,7 +34,7 @@ routes.post('/register', async (req, res) => {
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
 
-    // Upsert student
+    // Upsert students
     const studentsPromises = students.map(async student =>
       Student.findOneAndUpdate(
         { email: student },
@@ -44,6 +53,7 @@ routes.post('/register', async (req, res) => {
     );
 
     await Promise.all([].concat(teacherPromise, studentsPromises, pairsPromises));
+
     return res.json({ message: 'success' });
   } catch (e) {
     logger.error(e);
@@ -51,13 +61,22 @@ routes.post('/register', async (req, res) => {
   }
 });
 
+/**
+ * Retrieves the list of common students shared by teachers
+ */
 routes.get('/commonstudents', async (req, res) => {
   const { teachers = '' } = res.query;
   const teacherEmails = teachers.split(',');
 
   try {
-    const pairs = await Pair.find({ teacherEmail: { $or: teacherEmails } });
+    // Find student-teacher pairs
+    const pairs = await Pair.find({
+      teacherEmail: { $or: teacherEmails }
+    });
+
+    // Convert to student emails
     const students = pairs.map(p => p.studentEmail);
+
     return res.json({ students, message: 'success' });
   } catch (e) {
     logger.error(e);
@@ -65,15 +84,22 @@ routes.get('/commonstudents', async (req, res) => {
   }
 });
 
+/**
+ * Suspends a student.
+ */
 routes.post('/suspend', async (req, res) => {
   const { student: email } = req.body;
   try {
+    // Check if student exists
     const studentExists = await Student.findOne({ email });
 
     if (!studentExists) {
-      return res.error({ message: 'No such student!' });
+      return res.error({ message: `No such student! Email=${email}` });
     }
 
+    /**
+     * Suspend student.
+     */
     await Student.findOneAndUpdate(
       { email },
       { email, dateSuspended: new Date() },
@@ -87,39 +113,34 @@ routes.post('/suspend', async (req, res) => {
   }
 });
 
+/**
+ * Retrieve students, from a given
+ * notification and teacher email.
+ */
 routes.post('/retrievefornotifications', async (req, res) => {
   const { teacher: teacherEmail, notification } = req.body;
 
   try {
-    // TODO implement
+    const mentionedStudentEmails = retrieveEmails(notification);
+    const studentEmails = await Pair.find({ teacherEmail }).map(pair => pair.studentEmail);
+    const emailsToFind = _.uniq([...mentionedStudentEmails, ...studentEmails]);
+
+    // Find students with given email, and not suspended.
+    // Note we convert the array into a set,
+    // To prevent duplicates in querying which can be
+    // Bad in large n.
+    const students = await Student.find({
+      email: { $in: emailsToFind },
+      dateSuspended: null
+    });
+
+    return {
+      recipients: students.map(student => student.email)
+    };
   } catch (e) {
     logger.error(e);
     return res.error({ message: 'unsuccessful' });
   }
-});
-
-/**
- * GET /list
- *
- * This is a sample route demonstrating
- * a simple approach to error handling and testing
- * the global error handler. You most certainly want to
- * create different/better error handlers depending on
- * your use case.
- */
-routes.get('/list', (req, res, next) => {
-  const { title } = req.query;
-
-  if (title == null || title === '') {
-    // You probably want to set the response HTTP status to 400 Bad Request
-    // or 422 Unprocessable Entity instead of the default 500 of
-    // the global error handler (e.g check out https://github.com/kbariotis/throw.js).
-    // This is just for demo purposes.
-    next(new Error('The "title" parameter is required'));
-    return;
-  }
-
-  res.render('index', { title });
 });
 
 export default routes;

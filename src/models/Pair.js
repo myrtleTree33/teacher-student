@@ -29,4 +29,4 @@ teacherSchema.set('toJSON', {
 // This will remove `_id` and `__v`
 teacherSchema.plugin(mongooseHidden());
 
-export default mongoose.model('Teacher', teacherSchema);
+export default mongoose.model('Pair', teacherSchema);
