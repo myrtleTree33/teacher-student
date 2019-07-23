@@ -27,6 +27,10 @@ routes.post('/register', async (req, res) => {
   try {
     const { teacher, students = [] } = req.body;
 
+    if (!teacher) {
+      throw new Error('No teacher specified!');
+    }
+
     // Upsert teacher
     const teacherPromise = Teacher.findOneAndUpdate(
       { email: teacher },
@@ -35,29 +39,35 @@ routes.post('/register', async (req, res) => {
     );
 
     // Upsert students
-    const studentsPromises = students.map(async student =>
-      Student.findOneAndUpdate(
+    const studentsPromises = students.filter(Boolean).map(async student => {
+      if (!student) {
+        return null;
+      }
+
+      return Student.findOneAndUpdate(
         { email: student },
         { email: student },
         { upsert: true, new: true, setDefaultsOnInsert: true }
-      )
-    );
+      );
+    });
 
     // Upsert pairs
-    const pairsPromises = students.map(async student =>
-      Pair.findByIdAndUpdate(
-        { teacherEmail: student },
-        { studentEmail: student },
-        { upsert: true, new: true, setDefaultsOnInsert: true }
-      )
-    );
+    const pairsPromises = students
+      .filter(Boolean)
+      .map(async student =>
+        Pair.findByIdAndUpdate(
+          { teacherEmail: teacher },
+          { studentEmail: student },
+          { upsert: true, new: true, setDefaultsOnInsert: true }
+        )
+      );
 
     await Promise.all([].concat(teacherPromise, studentsPromises, pairsPromises));
 
     return res.json({ message: 'success' });
   } catch (e) {
-    logger.error(e);
-    return res.error({ message: 'unsuccessful' });
+    logger.error(e.message);
+    res.status(400).json({ message: e.message });
   }
 });
 
@@ -80,7 +90,7 @@ routes.get('/commonstudents', async (req, res) => {
     return res.json({ students, message: 'success' });
   } catch (e) {
     logger.error(e);
-    return res.error({ message: 'unsuccessful' });
+    throw new Error({ message: 'unsuccessful' });
   }
 });
 
