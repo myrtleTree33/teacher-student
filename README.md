@@ -15,7 +15,7 @@ Run the following:
 
 ## API Documentation
 
-Please refer to the
+Please refer to https://www.getpostman.com/collections/6906460ddc279d9d6c68
 
 ## Live API Demo
 
