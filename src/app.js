@@ -2,17 +2,14 @@ import express from 'express';
 import path from 'path';
 import morgan from 'morgan';
 import bodyParser from 'body-parser';
-import mongoose from 'mongoose';
 import cors from 'cors';
 
 import logger from './logger';
-
+import initDb from './utils/db';
 import baseRoutes from './routes/apiRoutes';
 
-// connect to Mongo DB
-logger.info(`Connecting to ${process.env.MONGO_URI}..`);
-mongoose.connect(process.env.MONGO_URI);
-logger.info(`Connected to ${process.env.MONGO_URI}`);
+// Initialize database
+initDb();
 
 const app = express();
 app.disable('x-powered-by');
