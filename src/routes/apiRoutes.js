@@ -6,6 +6,7 @@ import logger from '../logger';
 import Teacher from '../models/Teacher';
 import Student from '../models/Student';
 import Pair from '../models/Pair';
+import { rejects } from 'assert';
 
 const routes = Router();
 
@@ -55,9 +56,9 @@ routes.post('/register', async (req, res) => {
     const pairsPromises = students
       .filter(Boolean)
       .map(async student =>
-        Pair.findByIdAndUpdate(
-          { teacherEmail: teacher },
-          { studentEmail: student },
+        Pair.findOneAndUpdate(
+          { teacherEmail: teacher, studentEmail: student },
+          { teacherEmail: teacher, studentEmail: student },
           { upsert: true, new: true, setDefaultsOnInsert: true }
         )
       );
@@ -75,13 +76,13 @@ routes.post('/register', async (req, res) => {
  * Retrieves the list of common students shared by teachers
  */
 routes.get('/commonstudents', async (req, res) => {
-  const { teachers = '' } = res.query;
-  const teacherEmails = teachers.split(',');
-
   try {
+    const { teachers = '' } = req.query;
+    const teacherEmails = teachers.split(',');
+
     // Find student-teacher pairs
     const pairs = await Pair.find({
-      teacherEmail: { $or: teacherEmails }
+      teacherEmail: { $in: teacherEmails }
     });
 
     // Convert to student emails
@@ -89,8 +90,8 @@ routes.get('/commonstudents', async (req, res) => {
 
     return res.json({ students, message: 'success' });
   } catch (e) {
-    logger.error(e);
-    throw new Error({ message: 'unsuccessful' });
+    logger.error(e.message);
+    res.status(400).json({ message: e.message });
   }
 });
 
@@ -104,7 +105,7 @@ routes.post('/suspend', async (req, res) => {
     const studentExists = await Student.findOne({ email });
 
     if (!studentExists) {
-      return res.error({ message: `No such student! Email=${email}` });
+      throw new Error(`No such student! Email=${email}`);
     }
 
     /**
@@ -118,8 +119,8 @@ routes.post('/suspend', async (req, res) => {
 
     return res.json({ message: 'success' });
   } catch (e) {
-    logger.error(e);
-    return res.error({ message: 'unsuccessful' });
+    logger.error(e.message);
+    res.status(400).json({ message: e.message });
   }
 });
 
@@ -131,8 +132,14 @@ routes.post('/retrievefornotifications', async (req, res) => {
   const { teacher: teacherEmail, notification } = req.body;
 
   try {
+    // Emails by mention
     const mentionedStudentEmails = retrieveEmails(notification);
-    const studentEmails = await Pair.find({ teacherEmail }).map(pair => pair.studentEmail);
+
+    // Emails by teacher
+    let studentEmails = await Pair.find({ teacherEmail });
+    studentEmails = studentEmails.map(pair => pair.studentEmail);
+
+    // Coalesce and turn into set
     const emailsToFind = _.uniq([...mentionedStudentEmails, ...studentEmails]);
 
     // Find students with given email, and not suspended.
@@ -144,12 +151,15 @@ routes.post('/retrievefornotifications', async (req, res) => {
       dateSuspended: null
     });
 
-    return {
-      recipients: students.map(student => student.email)
-    };
+    // Get emails
+    const recipients = students.map(student => student.email);
+
+    return res.json({
+      recipients
+    });
   } catch (e) {
-    logger.error(e);
-    return res.error({ message: 'unsuccessful' });
+    logger.error(e.message);
+    res.status(400).json({ message: e.message });
   }
 });
 
