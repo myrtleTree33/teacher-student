@@ -20,3 +20,9 @@ Please refer to the
 ## Live API Demo
 
 Please access at https://frogbait.ngrok.io
+
+## Run tests
+
+Please run the following:
+
+    $ yarn run test
