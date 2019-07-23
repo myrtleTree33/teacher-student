@@ -6,6 +6,10 @@ import logger from '../logger';
 const initDb = () => {
   const mongoUri = process.env.MONGO_URI;
 
+  if (mongoose.connection.readyState !== 0) {
+    return;
+  }
+
   // connect to Mongo DB
   if (mongoUri) {
     logger.info(`Connecting to ${mongoUri}..`);

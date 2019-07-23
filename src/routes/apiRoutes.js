@@ -21,6 +21,12 @@ const retrieveEmails = notification => {
   return tokens.filter(t => t.includes('@'));
 };
 
+const findCommonStudentEmails = (pairs, numTeachers) => {
+  const groups = _.groupBy(pairs, 'studentEmail');
+  const commonPairs = _.omitBy(groups, g => g.length !== numTeachers);
+  return _.keys(commonPairs);
+};
+
 /**
  * Registers or updates a student to a teacher
  */
@@ -86,7 +92,7 @@ routes.get('/commonstudents', async (req, res) => {
     });
 
     // Convert to student emails
-    const students = pairs.map(p => p.studentEmail);
+    const students = findCommonStudentEmails(pairs, teacherEmails.length);
 
     return res.json({ students, message: 'success' });
   } catch (e) {
